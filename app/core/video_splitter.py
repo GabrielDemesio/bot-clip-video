@@ -1,0 +1,228 @@
+
+import os
+import subprocess
+from typing import Callable, List, Optional
+
+from moviepy import VideoFileClip
+
+from .config import SilenceDetectionConfig, LessonSplitConfig
+from .dto import TimeRange, LessonSegment
+from .silence_detector import detect_silence_ranges
+from .utils import format_time
+
+
+Logger = Callable[[str], None]
+
+
+def _extract_audio_ffmpeg(video_path: str, audio_path: str, logger: Optional[Logger] = None) -> None:
+    """Extract audio from video using FFmpeg directly (much faster than moviepy)."""
+    if logger:
+        logger("Extracting audio with FFmpeg...")
+
+    # FFmpeg command: extract audio, mono, 8kHz sample rate
+    cmd = [
+        "ffmpeg",
+        "-i", video_path,
+        "-vn",  # No video
+        "-ar", "8000",  # Sample rate 8kHz (faster, good enough for silence detection)
+        "-ac", "1",  # Mono (1 channel)
+        "-f", "wav",  # WAV format
+        "-y",  # Overwrite output file
+        audio_path
+    ]
+
+    try:
+        # Run FFmpeg with suppressed output
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+        if logger:
+            logger(f"✓ Audio extracted to: {audio_path}")
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"FFmpeg failed to extract audio: {e.stderr.decode()}")
+    except FileNotFoundError:
+        raise RuntimeError("FFmpeg not found. Please install FFmpeg: sudo apt install ffmpeg")
+
+
+def _get_video_duration_ffmpeg(video_path: str) -> float:
+    """Get video duration using FFmpeg (faster than loading with moviepy)."""
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        video_path
+    ]
+
+    try:
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        duration = float(result.stdout.decode().strip())
+        return duration
+    except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
+        # Fallback to moviepy if ffprobe fails
+        video = VideoFileClip(video_path)
+        duration = video.duration
+        video.close()
+        return duration
+
+
+def _cut_video_ffmpeg(
+    video_path: str,
+    output_path: str,
+    start_time: float,
+    end_time: float,
+    logger: Optional[Logger] = None
+) -> None:
+    """Cut video segment using FFmpeg (much faster than moviepy with codec copy)."""
+    duration = end_time - start_time
+
+    cmd = [
+        "ffmpeg",
+        "-ss", str(start_time),  # Start time
+        "-i", video_path,  # Input file
+        "-t", str(duration),  # Duration
+        "-c", "copy",  # Copy codec (no re-encoding)
+        "-avoid_negative_ts", "make_zero",  # Fix timestamp issues
+        "-y",  # Overwrite output
+        output_path
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+        if logger:
+            logger(f"  ✓ Saved")
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"FFmpeg failed to cut video: {e.stderr.decode()}")
+
+
+def _build_non_silent_ranges(
+    silent_ranges: List[TimeRange],
+    video_duration: float,
+) -> List[TimeRange]:
+    """Compute non-silent ranges (lessons) as the complement of silence intervals."""
+    if not silent_ranges:
+        return [TimeRange(0.0, video_duration)]
+
+    non_silent: List[TimeRange] = []
+
+    # From start of video until first silence
+    first_silence = silent_ranges[0]
+    if first_silence.start > 0:
+        non_silent.append(TimeRange(0.0, first_silence.start))
+
+    # Between silences
+    for prev, nxt in zip(silent_ranges, silent_ranges[1:]):
+        non_silent.append(TimeRange(prev.end, nxt.start))
+
+    # From end of last silence until end of video
+    last_silence = silent_ranges[-1]
+    if last_silence.end < video_duration:
+        non_silent.append(TimeRange(last_silence.end, video_duration))
+
+    return non_silent
+
+
+def split_video_into_lessons(
+    video_path: str,
+    output_dir: str,
+    silence_config: Optional[SilenceDetectionConfig] = None,
+    lesson_config: Optional[LessonSplitConfig] = None,
+    logger: Optional[Logger] = print,
+) -> List[LessonSegment]:
+    """Split a video into lesson files based on silent intervals.
+
+    Returns a list of LessonSegment objects describing the generated lessons.
+    """
+    if silence_config is None:
+        silence_config = SilenceDetectionConfig()
+
+    if lesson_config is None:
+        lesson_config = LessonSplitConfig()
+
+    if logger is None:
+        logger = lambda *_args, **_kwargs: None  # no-op logger
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    video_name = os.path.basename(video_path)
+    logger(f"=== Processing video: {video_name} ===")
+
+    temp_audio_path = os.path.join(output_dir, "_temp_audio.wav")
+
+    # Get video duration using FFmpeg (faster)
+    logger("Getting video info...")
+    video_duration = _get_video_duration_ffmpeg(video_path)
+    logger(f"Video duration: {format_time(video_duration)}")
+
+    # Extract audio using FFmpeg (much faster than moviepy)
+    _extract_audio_ffmpeg(video_path, temp_audio_path, logger)
+
+    # Detect silence ranges
+    logger("Detecting silence ranges...")
+    silent_ranges = detect_silence_ranges(temp_audio_path, silence_config)
+
+    if not silent_ranges:
+        logger("No long silences found. The whole video will be considered as one lesson.")
+
+    else:
+        logger("Silences detected:")
+        for r in silent_ranges:
+            logger(f"  {format_time(r.start)} -> {format_time(r.end)}")
+
+    # Compute non-silent (lesson) ranges
+    non_silent_ranges = _build_non_silent_ranges(silent_ranges, video_duration)
+
+    logger("\nRaw non-silent ranges (before filters):")
+    for r in non_silent_ranges:
+        logger(f"  {format_time(r.start)} -> {format_time(r.end)} ({r.duration():.1f}s)")
+
+    # Filter out very short lessons
+    filtered_ranges: List[TimeRange] = [
+        r for r in non_silent_ranges
+        if r.duration() >= lesson_config.min_lesson_duration_sec
+    ]
+
+    if not filtered_ranges:
+        logger("No segments were long enough to be considered lessons.")
+        if os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+        return []
+
+    logger("\nFinal lesson ranges (after filters):")
+    for idx, r in enumerate(filtered_ranges, start=1):
+        logger(f"  Lesson {idx:02d}: {format_time(r.start)} -> {format_time(r.end)} ({r.duration():.1f}s)")
+
+    # Generate lesson clips
+    lessons: List[LessonSegment] = []
+    logger("\nGenerating lesson files...")
+
+    for idx, r in enumerate(filtered_ranges, start=1):
+        clip_start = max(0.0, r.start - lesson_config.padding_before_sec)
+        clip_end = min(video_duration, r.end + lesson_config.padding_after_sec)
+
+        output_filename = f"lesson_{idx:02d}.mp4"
+        output_path = os.path.join(output_dir, output_filename)
+
+        logger(f"\n[Lesson {idx:02d}]")
+        logger(f"  Time: {format_time(clip_start)} -> {format_time(clip_end)}")
+        logger(f"  Saving to: {output_path}")
+
+        # Use FFmpeg directly for much faster cutting (no re-encoding)
+        _cut_video_ffmpeg(video_path, output_path, clip_start, clip_end, logger)
+
+        lessons.append(LessonSegment(start=clip_start, end=clip_end, index=idx))
+
+    # Clean up temp audio
+    if os.path.exists(temp_audio_path):
+        os.remove(temp_audio_path)
+
+    logger("\nDone processing this video.\n")
+    return lessons
