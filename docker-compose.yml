@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  video-splitter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: video-lesson-splitter:latest
+    container_name: video-lesson-splitter
+    
+    # Interactive mode for menu selection
+    stdin_open: true
+    tty: true
+    
+    # Mount volumes for input/output
+    volumes:
+      - ./videos_input:/app/videos_input
+      - ./lessons_output:/app/lessons_output
+      - ./config.yaml:/app/config.yaml:ro
+      - ./logs:/app/logs
+    
+    # Environment variables (optional overrides)
+    environment:
+      - PYTHONUNBUFFERED=1
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    
+    # Restart policy
+    restart: unless-stopped
+
