@@ -239,11 +239,3 @@ Summary of generated lessons:
 - Verifique se o vídeo tem áudio
 - Reduza `min_lesson_duration_sec` se as aulas forem curtas
 
-### Processamento muito lento
-- Verifique se está usando `codec: "copy"` no `config.yaml`
-- Reduza `sample_rate` para 8000 Hz
-- Use SSD em vez de HD
-
-## 📝 Licença
-
-MIT License - sinta-se livre para usar e modificar!
