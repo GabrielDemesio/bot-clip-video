@@ -1,9 +1,11 @@
 
 import os
+import re
 import subprocess
 from typing import Callable, List, Optional
 
 from moviepy import VideoFileClip
+from tqdm import tqdm
 
 from .config import SilenceDetectionConfig, LessonSplitConfig
 from .dto import TimeRange, LessonSegment
@@ -14,8 +16,8 @@ from .utils import format_time
 Logger = Callable[[str], None]
 
 
-def _extract_audio_ffmpeg(video_path: str, audio_path: str, logger: Optional[Logger] = None) -> None:
-    """Extract audio from video using FFmpeg directly (much faster than moviepy)."""
+def _extract_audio_ffmpeg(video_path: str, audio_path: str, video_duration: float, logger: Optional[Logger] = None) -> None:
+    """Extract audio from video using FFmpeg directly with progress bar."""
     if logger:
         logger("Extracting audio with FFmpeg...")
 
@@ -28,21 +30,48 @@ def _extract_audio_ffmpeg(video_path: str, audio_path: str, logger: Optional[Log
         "-ac", "1",  # Mono (1 channel)
         "-f", "wav",  # WAV format
         "-y",  # Overwrite output file
+        "-progress", "pipe:2",  # Progress to stderr
         audio_path
     ]
 
     try:
-        # Run FFmpeg with suppressed output
-        result = subprocess.run(
+        # Run FFmpeg with progress monitoring
+        process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            check=True
+            universal_newlines=True
         )
+
+        # Progress bar
+        with tqdm(total=100, desc="Extracting audio", unit="%", ncols=80) as pbar:
+            last_progress = 0
+
+            for line in process.stderr:
+                # Parse FFmpeg progress output
+                # Look for "out_time_ms=XXXXX" which gives us current position in microseconds
+                match = re.search(r'out_time_ms=(\d+)', line)
+                if match:
+                    time_us = int(match.group(1))
+                    time_s = time_us / 1_000_000
+                    progress = min(100, int((time_s / video_duration) * 100))
+
+                    # Update progress bar
+                    delta = progress - last_progress
+                    if delta > 0:
+                        pbar.update(delta)
+                        last_progress = progress
+
+        # Wait for process to complete
+        return_code = process.wait()
+
+        if return_code != 0:
+            stderr_output = process.stderr.read() if process.stderr else ""
+            raise RuntimeError(f"FFmpeg failed to extract audio (code {return_code}): {stderr_output}")
+
         if logger:
             logger(f"✓ Audio extracted to: {audio_path}")
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"FFmpeg failed to extract audio: {e.stderr.decode()}")
+
     except FileNotFoundError:
         raise RuntimeError("FFmpeg not found. Please install FFmpeg: sudo apt install ffmpeg")
 
@@ -163,7 +192,7 @@ def split_video_into_lessons(
     logger(f"Video duration: {format_time(video_duration)}")
 
     # Extract audio using FFmpeg (much faster than moviepy)
-    _extract_audio_ffmpeg(video_path, temp_audio_path, logger)
+    _extract_audio_ffmpeg(video_path, temp_audio_path, video_duration, logger)
 
     # Detect silence ranges
     logger("Detecting silence ranges...")
@@ -204,21 +233,21 @@ def split_video_into_lessons(
     lessons: List[LessonSegment] = []
     logger("\nGenerating lesson files...")
 
-    for idx, r in enumerate(filtered_ranges, start=1):
-        clip_start = max(0.0, r.start - lesson_config.padding_before_sec)
-        clip_end = min(video_duration, r.end + lesson_config.padding_after_sec)
+    with tqdm(total=len(filtered_ranges), desc="Cutting videos", unit="lesson", ncols=80) as pbar:
+        for idx, r in enumerate(filtered_ranges, start=1):
+            clip_start = max(0.0, r.start - lesson_config.padding_before_sec)
+            clip_end = min(video_duration, r.end + lesson_config.padding_after_sec)
 
-        output_filename = f"lesson_{idx:02d}.mp4"
-        output_path = os.path.join(output_dir, output_filename)
+            output_filename = f"lesson_{idx:02d}.mp4"
+            output_path = os.path.join(output_dir, output_filename)
 
-        logger(f"\n[Lesson {idx:02d}]")
-        logger(f"  Time: {format_time(clip_start)} -> {format_time(clip_end)}")
-        logger(f"  Saving to: {output_path}")
+            pbar.set_description(f"Cutting lesson {idx:02d}/{len(filtered_ranges)}")
 
-        # Use FFmpeg directly for much faster cutting (no re-encoding)
-        _cut_video_ffmpeg(video_path, output_path, clip_start, clip_end, logger)
+            # Use FFmpeg directly for much faster cutting (no re-encoding)
+            _cut_video_ffmpeg(video_path, output_path, clip_start, clip_end, logger)
 
-        lessons.append(LessonSegment(start=clip_start, end=clip_end, index=idx))
+            lessons.append(LessonSegment(start=clip_start, end=clip_end, index=idx))
+            pbar.update(1)
 
     # Clean up temp audio
     if os.path.exists(temp_audio_path):
