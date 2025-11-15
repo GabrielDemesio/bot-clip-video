@@ -5,12 +5,19 @@ from tqdm import tqdm
 
 from .config import SilenceDetectionConfig
 from .dto import TimeRange
+from .exceptions import SilenceDetectionError
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def detect_silence_ranges(audio_path: str, config: SilenceDetectionConfig) -> List[TimeRange]:
     """Detect long silence ranges in an audio file and return them as TimeRange objects."""
-    print("Loading audio file...")
-    audio = AudioSegment.from_wav(audio_path)
+    try:
+        print("Loading audio file...")
+        audio = AudioSegment.from_wav(audio_path)
+    except Exception as e:
+        raise SilenceDetectionError(audio_path, f"Failed to load audio file: {e}")
 
     duration_seconds = len(audio) / 1000.0
     print(f"Audio duration: {duration_seconds:.1f}s")

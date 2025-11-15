@@ -1,86 +1,249 @@
 
 # Video Lesson Splitter
 
-Pequena ferramenta em Python para dividir um vídeo longo de módulo em **várias aulas**,
-usando **intervalos de silêncio** no áudio como pontos de corte.
+🎬 Ferramenta profissional em Python para dividir vídeos longos de cursos em **aulas individuais**,
+usando **detecção automática de silêncios** no áudio como pontos de corte.
 
-Arquitetura separada em camadas:
-- `app/core`: regras de negócio (detecção de silêncio, split de vídeo, DTOs, config)
-- `app/services`: orquestração de módulos (usa o core)
-- `app/cli`: interface de linha de comando (menu para escolher o vídeo)
-- `main.py`: ponto de entrada
+## ✨ Features
 
-## Requisitos
+- ✅ **Detecção automática de silêncios** para identificar quebras entre aulas
+- ✅ **Processamento otimizado com FFmpeg** (10-50x mais rápido que re-encoding)
+- ✅ **Barras de progresso** em tempo real para todas as etapas
+- ✅ **Configuração flexível** via arquivo YAML
+- ✅ **Logging profissional** com níveis configuráveis
+- ✅ **Validação robusta** de arquivos e dependências
+- ✅ **Tratamento de erros** com exceções customizadas
+- ✅ **Arquitetura limpa** separada em camadas
 
-- Python 3.10+
-- `ffmpeg` instalado no sistema
-- Dependências Python:
+## 🏗️ Arquitetura
 
-```bash
-pip install -r requirements.txt
+```
+app/
+├── core/           # Regras de negócio
+│   ├── config.py           # Configurações (DTOs)
+│   ├── config_loader.py    # Carregador de config YAML
+│   ├── dto.py              # Data Transfer Objects
+│   ├── exceptions.py       # Exceções customizadas
+│   ├── logger.py           # Sistema de logging
+│   ├── silence_detector.py # Detecção de silêncios
+│   ├── validators.py       # Validação de arquivos
+│   ├── video_splitter.py   # Divisão de vídeos
+│   └── utils.py            # Utilitários
+├── services/       # Orquestração
+│   └── module_processor.py # Processador de módulos
+└── cli/            # Interface CLI
+    ├── main.py             # Ponto de entrada
+    └── menu.py             # Menu interativo
 ```
 
-## Estrutura de pastas
+## 📋 Requisitos
+
+- **Python 3.10+**
+- **FFmpeg** instalado no sistema
+- Dependências Python (instaladas automaticamente):
+  - `moviepy>=1.0.3`
+  - `pydub>=0.25.1`
+  - `tqdm>=4.65.0`
+  - `pyyaml>=6.0`
+
+## 📁 Estrutura de Pastas
 
 ```text
-video_lesson_splitter/
-├── app/
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   ├── dto.py
-│   │   ├── silence_detector.py
-│   │   ├── utils.py
-│   │   └── video_splitter.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── module_processor.py
-│   └── cli/
-│       ├── __init__.py
-│       ├── main.py
-│       └── menu.py
-├── lessons_output/      # será criada automaticamente
-├── videos_input/        # coloque seus vídeos aqui
-├── main.py
-├── requirements.txt
-└── README.md
+video-lesson-splitter/
+├── app/                    # Código fonte
+│   ├── core/              # Lógica de negócio
+│   ├── services/          # Orquestração
+│   └── cli/               # Interface CLI
+├── videos_input/          # 📥 Coloque seus vídeos aqui
+├── lessons_output/        # 📤 Aulas geradas (criado automaticamente)
+├── config.yaml            # ⚙️ Configurações
+├── main.py                # 🚀 Ponto de entrada
+├── requirements.txt       # 📦 Dependências
+├── pyproject.toml         # 📝 Metadados do projeto
+└── README.md              # 📖 Documentação
 ```
 
-## Como usar
+## 🚀 Como Usar
 
-1. Crie um ambiente virtual (opcional, mas recomendado):
+### Opção 1: Docker (Recomendado) 🐳
 
 ```bash
+# 1. Build da imagem
+docker-compose build
+
+# 2. Adicione seus vídeos
+cp seu_video.mp4 videos_input/
+
+# 3. Execute
+docker-compose run --rm video-splitter
+```
+
+**Vantagens:**
+- ✅ Não precisa instalar Python ou FFmpeg
+- ✅ Ambiente isolado e reproduzível
+- ✅ Funciona em qualquer sistema operacional
+
+📖 **[Guia Completo de Docker](DOCKER.md)**
+
+---
+
+### Opção 2: Instalação Local
+
+```bash
+# Clone o repositório (ou baixe o código)
+git clone <seu-repo>
+cd video-lesson-splitter
+
+# Crie um ambiente virtual (recomendado)
 python -m venv .venv
 source .venv/bin/activate  # Linux/macOS
 # ou
-.venv\Scripts\activate   # Windows
-```
+.venv\Scripts\activate     # Windows
 
-2. Instale as dependências:
-
-```bash
+# Instale as dependências
 pip install -r requirements.txt
 ```
 
-3. Garanta que o `ffmpeg` está instalado (no Linux, por exemplo):
+### 2. Instale o FFmpeg
 
+**Ubuntu/Debian:**
 ```bash
-sudo apt-get install ffmpeg
+sudo apt install ffmpeg
 ```
 
-4. Coloque seus vídeos brutos (ex: `modulo_01.mp4`) na pasta:
+**macOS:**
+```bash
+brew install ffmpeg
+```
 
-```text
+**Windows:**
+- Baixe de [ffmpeg.org/download.html](https://ffmpeg.org/download.html)
+- Adicione ao PATH do sistema
+
+### 3. Configure (Opcional)
+
+Edite `config.yaml` para ajustar:
+- Sensibilidade de detecção de silêncio
+- Duração mínima das aulas
+- Padding antes/depois de cada aula
+- Caminhos de entrada/saída
+
+```yaml
+silence_detection:
+  min_silence_len_ms: 10000        # 10 segundos de silêncio
+  silence_thresh_offset_db: 30     # Sensibilidade
+
+lesson_split:
+  min_lesson_duration_sec: 60      # Aulas mínimas de 1 minuto
+  padding_before_sec: 2            # 2s antes
+  padding_after_sec: 2             # 2s depois
+```
+
+### 4. Adicione seus vídeos
+
+Coloque os vídeos na pasta `videos_input/`:
+```
 videos_input/
+├── modulo_01.mp4
+├── modulo_02.mp4
+└── curso_completo.mp4
 ```
 
-5. Rode o programa:
+### 5. Execute
 
 ```bash
 python main.py
 ```
-## Observação
 
-- O script espera que o áudio do vídeo tenha volume razoável. Se estiver muito baixo ou muito alto, talvez você precise brincar com `silence_thresh_offset_db` para calibrar o que é considerado silêncio.
-- Ele trabalha com um vídeo por vez, escolhido via menu no terminal.
+O programa vai:
+1. ✅ Validar FFmpeg
+2. 📋 Listar vídeos disponíveis
+3. 🎯 Permitir escolher qual processar
+4. 📊 Mostrar progresso em tempo real
+5. 💾 Salvar aulas em `lessons_output/`
+
+## ⚙️ Configuração Avançada
+
+### Ajustar Sensibilidade de Silêncio
+
+Se o programa não está detectando os silêncios corretamente:
+
+- **Detectando silêncios demais**: Aumente `silence_thresh_offset_db` (ex: 35)
+- **Não detectando silêncios**: Diminua `silence_thresh_offset_db` (ex: 20)
+- **Silêncios muito curtos**: Aumente `min_silence_len_ms` (ex: 15000)
+
+### Logging
+
+Para debug, ative logs em arquivo no `config.yaml`:
+
+```yaml
+logging:
+  level: "DEBUG"
+  save_to_file: true
+  log_file: "video_splitter.log"
+```
+
+## 📊 Exemplo de Saída
+
+```
+==== Video Lesson Splitter ====
+
+✓ Configuration loaded from config.yaml
+✓ FFmpeg and FFprobe are installed
+
+Available videos:
+  [1] Go Expert part1.mp4
+  [2] Python Course.mp4
+
+Type the number of the video you want to process: 1
+
+Selected video: Go Expert part1.mp4
+
+Output directory: lessons_output/Go Expert part1
+=== Processing video: Go Expert part1.mp4 ===
+Getting video info...
+Video duration: 07:27:16
+Extracting audio with FFmpeg...
+Extracting audio: 100%|████████████████| 100/100 [01:23<00:00,  1.20%/s]
+✓ Audio extracted
+
+Loading audio file...
+Audio duration: 26836.0s
+Analyzing audio (threshold: -42.3 dBFS)...
+Detecting silences: 100%|████████████| 448/448 [02:15<00:00,  3.31chunk/s]
+
+Silences detected:
+  00:15:42 -> 00:15:54
+  00:32:18 -> 00:32:31
+  ...
+
+Generating lesson files...
+Cutting videos: 100%|████████████████| 25/25 [00:45<00:00,  1.80s/lesson]
+
+Summary of generated lessons:
+  Lesson 01: 00:00:00 -> 00:15:42 (942.0s)
+  Lesson 02: 00:15:54 -> 00:32:18 (984.0s)
+  ...
+
+✓ Processing completed successfully!
+```
+
+## 🐛 Troubleshooting
+
+### Erro: "FFmpeg not found"
+- Instale o FFmpeg conforme instruções acima
+- Verifique se está no PATH: `ffmpeg -version`
+
+### Erro: "No lessons found"
+- Ajuste `silence_thresh_offset_db` no `config.yaml`
+- Verifique se o vídeo tem áudio
+- Reduza `min_lesson_duration_sec` se as aulas forem curtas
+
+### Processamento muito lento
+- Verifique se está usando `codec: "copy"` no `config.yaml`
+- Reduza `sample_rate` para 8000 Hz
+- Use SSD em vez de HD
+
+## 📝 Licença
+
+MIT License - sinta-se livre para usar e modificar!

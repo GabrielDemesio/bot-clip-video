@@ -6,6 +6,11 @@ from app.core.config import SilenceDetectionConfig, LessonSplitConfig
 from app.core.dto import LessonSegment
 from app.core.video_splitter import split_video_into_lessons
 from app.core.utils import format_time
+from app.core.validators import validate_video_file, get_video_files_in_directory
+from app.core.exceptions import InvalidVideoFileError
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ModuleProcessor:
@@ -26,25 +31,37 @@ class ModuleProcessor:
         self.lesson_config = lesson_config or LessonSplitConfig()
 
     def list_videos(self) -> List[str]:
-        if not os.path.isdir(self.videos_dir):
-            return []
-        files = [
-            f
-            for f in os.listdir(self.videos_dir)
-            if f.lower().endswith((".mp4", ".mkv", ".mov", ".avi"))
-        ]
-        return sorted(files)
+        """List all video files in the videos directory."""
+        video_paths = get_video_files_in_directory(self.videos_dir)
+        # Return just filenames, not full paths
+        return [os.path.basename(path) for path in video_paths]
 
     def process_video(self, video_filename: str) -> List[LessonSegment]:
+        """
+        Process a video file and split it into lessons.
+
+        Args:
+            video_filename: Name of the video file in videos_dir
+
+        Returns:
+            List of LessonSegment objects
+
+        Raises:
+            InvalidVideoFileError: If video file is invalid
+        """
         video_path = os.path.join(self.videos_dir, video_filename)
-        if not os.path.isfile(video_path):
-            raise FileNotFoundError(f"Video not found: {video_path}")
+
+        # Validate video file
+        validate_video_file(video_path)
 
         video_basename, _ = os.path.splitext(os.path.basename(video_path))
         output_dir = os.path.join(self.output_base_dir, video_basename)
         os.makedirs(output_dir, exist_ok=True)
 
         print(f"Output directory: {output_dir}")
+        logger.info(f"Processing video: {video_path}")
+        logger.info(f"Output directory: {output_dir}")
+
         lessons = split_video_into_lessons(
             video_path=video_path,
             output_dir=output_dir,
@@ -61,7 +78,9 @@ class ModuleProcessor:
                     f"{format_time(lesson.start)} -> {format_time(lesson.end)}"
                     f" ({lesson.duration():.1f}s)"
                 )
+            logger.info(f"Generated {len(lessons)} lessons")
         else:
             print("No lessons generated.")
+            logger.warning("No lessons were generated")
 
         return lessons

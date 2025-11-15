@@ -1,0 +1,65 @@
+# Video Lesson Splitter Configuration
+
+# Silence Detection Settings
+silence_detection:
+  # Minimum silence duration in milliseconds to be considered a break between lessons
+  min_silence_len_ms: 10000
+  
+  # Offset in dB below the average audio level to consider as silence
+  # Higher values = more sensitive (detects more silences)
+  # Lower values = less sensitive (only very quiet parts)
+  silence_thresh_offset_db: 30
+
+# Lesson Split Settings
+lesson_split:
+  # Minimum duration in seconds for a segment to be considered a lesson
+  # Segments shorter than this will be filtered out
+  min_lesson_duration_sec: 60
+  
+  # Padding in seconds to add before each lesson starts
+  padding_before_sec: 2
+  
+  # Padding in seconds to add after each lesson ends
+  padding_after_sec: 2
+
+# Audio Extraction Settings
+audio_extraction:
+  # Sample rate for audio extraction (Hz)
+  # Lower = faster processing, but less accurate
+  # 8000 is good for silence detection, 16000 for better quality
+  sample_rate: 8000
+  
+  # Number of audio channels (1 = mono, 2 = stereo)
+  # Mono is faster and sufficient for silence detection
+  channels: 1
+
+# Video Processing Settings
+video_processing:
+  # Codec for video cutting ('copy' = no re-encoding, much faster)
+  codec: "copy"
+  
+  # Audio codec for video cutting ('copy' = no re-encoding)
+  audio_codec: "copy"
+
+# Paths
+paths:
+  # Directory where input videos are stored
+  videos_input: "videos_input"
+  
+  # Directory where output lessons will be saved
+  lessons_output: "lessons_output"
+
+# Logging
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Save logs to file
+  save_to_file: false
+  
+  # Log file path (if save_to_file is true)
+  log_file: "video_splitter.log"
+

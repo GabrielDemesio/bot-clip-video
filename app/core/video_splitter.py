@@ -11,6 +11,16 @@ from .config import SilenceDetectionConfig, LessonSplitConfig
 from .dto import TimeRange, LessonSegment
 from .silence_detector import detect_silence_ranges
 from .utils import format_time
+from .exceptions import (
+    FFmpegNotFoundError,
+    FFprobeNotFoundError,
+    AudioExtractionError,
+    VideoCuttingError,
+    NoLessonsFoundError
+)
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 
 Logger = Callable[[str], None]
@@ -67,13 +77,16 @@ def _extract_audio_ffmpeg(video_path: str, audio_path: str, video_duration: floa
 
         if return_code != 0:
             stderr_output = process.stderr.read() if process.stderr else ""
-            raise RuntimeError(f"FFmpeg failed to extract audio (code {return_code}): {stderr_output}")
+            raise AudioExtractionError(video_path, f"FFmpeg exit code {return_code}: {stderr_output}")
 
         if logger:
             logger(f"✓ Audio extracted to: {audio_path}")
 
     except FileNotFoundError:
-        raise RuntimeError("FFmpeg not found. Please install FFmpeg: sudo apt install ffmpeg")
+        raise FFmpegNotFoundError()
+    except Exception as e:
+        if not isinstance(e, (FFmpegNotFoundError, AudioExtractionError)):
+            raise AudioExtractionError(video_path, str(e))
 
 
 def _get_video_duration_ffmpeg(video_path: str) -> float:
@@ -90,12 +103,17 @@ def _get_video_duration_ffmpeg(video_path: str) -> float:
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
         duration = float(result.stdout.decode().strip())
         return duration
-    except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
+    except FileNotFoundError:
+        raise FFprobeNotFoundError()
+    except (subprocess.CalledProcessError, ValueError):
         # Fallback to moviepy if ffprobe fails
-        video = VideoFileClip(video_path)
-        duration = video.duration
-        video.close()
-        return duration
+        try:
+            video = VideoFileClip(video_path)
+            duration = video.duration
+            video.close()
+            return duration
+        except Exception as e:
+            raise AudioExtractionError(video_path, f"Failed to get video duration: {e}")
 
 
 def _cut_video_ffmpeg(
@@ -128,8 +146,10 @@ def _cut_video_ffmpeg(
         )
         if logger:
             logger(f"  ✓ Saved")
+    except FileNotFoundError:
+        raise FFmpegNotFoundError()
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"FFmpeg failed to cut video: {e.stderr.decode()}")
+        raise VideoCuttingError(video_path, f"FFmpeg error: {e.stderr.decode()}")
 
 
 def _build_non_silent_ranges(
@@ -223,7 +243,7 @@ def split_video_into_lessons(
         logger("No segments were long enough to be considered lessons.")
         if os.path.exists(temp_audio_path):
             os.remove(temp_audio_path)
-        return []
+        raise NoLessonsFoundError(video_path, "All segments too short after filtering")
 
     logger("\nFinal lesson ranges (after filters):")
     for idx, r in enumerate(filtered_ranges, start=1):
