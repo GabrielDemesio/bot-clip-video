@@ -163,9 +163,6 @@ temp_*
 !lessons_output/.gitkeep
 !videos_input/.gitkeep
 
-# Docker
-.docker/
-docker-compose.override.yml
 
 # Logs
 logs/
