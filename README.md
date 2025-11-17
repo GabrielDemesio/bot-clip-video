@@ -83,8 +83,6 @@ docker-compose run --rm video-splitter
 - ✅ Ambiente isolado e reproduzível
 - ✅ Funciona em qualquer sistema operacional
 
-📖 **[Guia Completo de Docker](DOCKER.md)**
-
 ---
 
 ### Opção 2: Instalação Local
