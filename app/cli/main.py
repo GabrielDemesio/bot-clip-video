@@ -27,7 +27,6 @@ def main() -> None:
     print("\n==== Video Lesson Splitter ====\n")
 
     try:
-        # Load configuration
         try:
             config = load_yaml_config()
             print("✓ Configuration loaded from config.yaml")
@@ -36,7 +35,6 @@ def main() -> None:
             print("Using default configuration...\n")
             config = None
 
-        # Setup logging
         logging_config = get_logging_config(config)
         logger = setup_logger(
             __name__,
@@ -46,7 +44,6 @@ def main() -> None:
             log_file=logging_config['log_file']
         )
 
-        # Validate FFmpeg installation
         try:
             validate_ffmpeg_installed()
             validate_ffprobe_installed()
@@ -59,19 +56,15 @@ def main() -> None:
             print("  Windows: Download from https://ffmpeg.org/download.html")
             sys.exit(1)
 
-        # Get paths from config
         paths = get_paths_config(config)
         videos_dir = paths['videos_input']
         output_base_dir = paths['lessons_output']
 
-        # Ensure directories exist
         ensure_directories(videos_dir, output_base_dir)
 
-        # Get processing configs
         silence_config = get_silence_detection_config(config)
         lesson_config = get_lesson_split_config(config)
 
-        # Create processor
         processor = ModuleProcessor(
             videos_dir=videos_dir,
             output_base_dir=output_base_dir,
@@ -79,7 +72,6 @@ def main() -> None:
             lesson_config=lesson_config,
         )
 
-        # List and choose video
         videos = processor.list_videos()
         if not videos:
             print(f"No videos found in '{videos_dir}'.")
@@ -93,7 +85,6 @@ def main() -> None:
 
         print(f"\nSelected video: {chosen}\n")
 
-        # Process video
         processor.process_video(chosen)
 
         print("\n✓ Processing completed successfully!")

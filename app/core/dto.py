@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 @dataclass
 class TimeRange:
-    start: float  # in seconds
-    end: float    # in seconds
+    start: float
+    end: float
 
     def duration(self) -> float:
         return max(0.0, self.end - self.start)
@@ -12,5 +12,5 @@ class TimeRange:
 
 @dataclass
 class LessonSegment(TimeRange):
-    index: int  # 1-based position within the video
+    index: int
 

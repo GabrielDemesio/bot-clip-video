@@ -31,21 +31,19 @@ def _extract_audio_ffmpeg(video_path: str, audio_path: str, video_duration: floa
     if logger:
         logger("Extracting audio with FFmpeg...")
 
-    # FFmpeg command: extract audio, mono, 8kHz sample rate
     cmd = [
         "ffmpeg",
         "-i", video_path,
-        "-vn",  # No video
-        "-ar", "8000",  # Sample rate 8kHz (faster, good enough for silence detection)
-        "-ac", "1",  # Mono (1 channel)
-        "-f", "wav",  # WAV format
-        "-y",  # Overwrite output file
-        "-progress", "pipe:2",  # Progress to stderr
+        "-vn",
+        "-ar", "8000",
+        "-ac", "1",
+        "-f", "wav",
+        "-y",
+        "-progress", "pipe:2",
         audio_path
     ]
 
     try:
-        # Run FFmpeg with progress monitoring
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -53,26 +51,21 @@ def _extract_audio_ffmpeg(video_path: str, audio_path: str, video_duration: floa
             universal_newlines=True
         )
 
-        # Progress bar
         with tqdm(total=100, desc="Extracting audio", unit="%", ncols=80) as pbar:
             last_progress = 0
 
             for line in process.stderr:
-                # Parse FFmpeg progress output
-                # Look for "out_time_ms=XXXXX" which gives us current position in microseconds
                 match = re.search(r'out_time_ms=(\d+)', line)
                 if match:
                     time_us = int(match.group(1))
                     time_s = time_us / 1_000_000
                     progress = min(100, int((time_s / video_duration) * 100))
 
-                    # Update progress bar
                     delta = progress - last_progress
                     if delta > 0:
                         pbar.update(delta)
                         last_progress = progress
 
-        # Wait for process to complete
         return_code = process.wait()
 
         if return_code != 0:
@@ -106,7 +99,6 @@ def _get_video_duration_ffmpeg(video_path: str) -> float:
     except FileNotFoundError:
         raise FFprobeNotFoundError()
     except (subprocess.CalledProcessError, ValueError):
-        # Fallback to moviepy if ffprobe fails
         try:
             video = VideoFileClip(video_path)
             duration = video.duration
@@ -128,12 +120,12 @@ def _cut_video_ffmpeg(
 
     cmd = [
         "ffmpeg",
-        "-ss", str(start_time),  # Start time
-        "-i", video_path,  # Input file
-        "-t", str(duration),  # Duration
-        "-c", "copy",  # Copy codec (no re-encoding)
-        "-avoid_negative_ts", "make_zero",  # Fix timestamp issues
-        "-y",  # Overwrite output
+        "-ss", str(start_time),
+        "-i", video_path,
+        "-t", str(duration),
+        "-c", "copy",
+        "-avoid_negative_ts", "make_zero",
+        "-y",
         output_path
     ]
 
@@ -162,16 +154,13 @@ def _build_non_silent_ranges(
 
     non_silent: List[TimeRange] = []
 
-    # From start of video until first silence
     first_silence = silent_ranges[0]
     if first_silence.start > 0:
         non_silent.append(TimeRange(0.0, first_silence.start))
 
-    # Between silences
     for prev, nxt in zip(silent_ranges, silent_ranges[1:]):
         non_silent.append(TimeRange(prev.end, nxt.start))
 
-    # From end of last silence until end of video
     last_silence = silent_ranges[-1]
     if last_silence.end < video_duration:
         non_silent.append(TimeRange(last_silence.end, video_duration))
@@ -197,7 +186,7 @@ def split_video_into_lessons(
         lesson_config = LessonSplitConfig()
 
     if logger is None:
-        logger = lambda *_args, **_kwargs: None  # no-op logger
+        logger = lambda *_args, **_kwargs: None
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -206,15 +195,12 @@ def split_video_into_lessons(
 
     temp_audio_path = os.path.join(output_dir, "_temp_audio.wav")
 
-    # Get video duration using FFmpeg (faster)
     logger("Getting video info...")
     video_duration = _get_video_duration_ffmpeg(video_path)
     logger(f"Video duration: {format_time(video_duration)}")
 
-    # Extract audio using FFmpeg (much faster than moviepy)
     _extract_audio_ffmpeg(video_path, temp_audio_path, video_duration, logger)
 
-    # Detect silence ranges
     logger("Detecting silence ranges...")
     silent_ranges = detect_silence_ranges(temp_audio_path, silence_config)
 
@@ -226,14 +212,12 @@ def split_video_into_lessons(
         for r in silent_ranges:
             logger(f"  {format_time(r.start)} -> {format_time(r.end)}")
 
-    # Compute non-silent (lesson) ranges
     non_silent_ranges = _build_non_silent_ranges(silent_ranges, video_duration)
 
     logger("\nRaw non-silent ranges (before filters):")
     for r in non_silent_ranges:
         logger(f"  {format_time(r.start)} -> {format_time(r.end)} ({r.duration():.1f}s)")
 
-    # Filter out very short lessons
     filtered_ranges: List[TimeRange] = [
         r for r in non_silent_ranges
         if r.duration() >= lesson_config.min_lesson_duration_sec
@@ -249,7 +233,6 @@ def split_video_into_lessons(
     for idx, r in enumerate(filtered_ranges, start=1):
         logger(f"  Lesson {idx:02d}: {format_time(r.start)} -> {format_time(r.end)} ({r.duration():.1f}s)")
 
-    # Generate lesson clips
     lessons: List[LessonSegment] = []
     logger("\nGenerating lesson files...")
 
@@ -263,13 +246,11 @@ def split_video_into_lessons(
 
             pbar.set_description(f"Cutting lesson {idx:02d}/{len(filtered_ranges)}")
 
-            # Use FFmpeg directly for much faster cutting (no re-encoding)
             _cut_video_ffmpeg(video_path, output_path, clip_start, clip_end, logger)
 
             lessons.append(LessonSegment(start=clip_start, end=clip_end, index=idx))
             pbar.update(1)
 
-    # Clean up temp audio
     if os.path.exists(temp_audio_path):
         os.remove(temp_audio_path)
 

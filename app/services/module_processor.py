@@ -33,7 +33,6 @@ class ModuleProcessor:
     def list_videos(self) -> List[str]:
         """List all video files in the videos directory."""
         video_paths = get_video_files_in_directory(self.videos_dir)
-        # Return just filenames, not full paths
         return [os.path.basename(path) for path in video_paths]
 
     def process_video(self, video_filename: str) -> List[LessonSegment]:
@@ -50,8 +49,6 @@ class ModuleProcessor:
             InvalidVideoFileError: If video file is invalid
         """
         video_path = os.path.join(self.videos_dir, video_filename)
-
-        # Validate video file
         validate_video_file(video_path)
 
         video_basename, _ = os.path.splitext(os.path.basename(video_path))

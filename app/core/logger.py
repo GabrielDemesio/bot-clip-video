@@ -29,27 +29,22 @@ def setup_logger(
     """
     logger = logging.getLogger(name)
     
-    # Convert string level to logging constant
     numeric_level = getattr(logging, level.upper(), logging.INFO)
     logger.setLevel(numeric_level)
     
-    # Avoid adding handlers multiple times
     if logger.handlers:
         return logger
     
-    # Default format
     if log_format is None:
         log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
     formatter = logging.Formatter(log_format)
     
-    # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(numeric_level)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
-    # File handler (optional)
     if save_to_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(numeric_level)
