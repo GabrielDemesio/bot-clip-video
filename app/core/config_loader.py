@@ -168,10 +168,10 @@ def get_audio_extraction_config(config: Optional[Dict[str, Any]] = None) -> Dict
 def get_video_processing_config(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Get video processing configuration.
-    
+
     Args:
         config: Loaded configuration dictionary
-    
+
     Returns:
         Dictionary with video processing settings
     """
@@ -180,11 +180,40 @@ def get_video_processing_config(config: Optional[Dict[str, Any]] = None) -> Dict
             'codec': 'copy',
             'audio_codec': 'copy'
         }
-    
+
     video_config = config.get('video_processing', {})
-    
+
     return {
         'codec': video_config.get('codec', 'copy'),
         'audio_codec': video_config.get('audio_codec', 'copy')
     }
 
+
+def get_s3_sync_config(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Get S3 sync configuration.
+
+    Args:
+        config: Loaded configuration dictionary
+
+    Returns:
+        Dictionary with S3 sync settings
+    """
+    if config is None:
+        return {
+            'enabled': False,
+            'bucket_name': '',
+            's3_prefix': '',
+            'aws_profile': '',
+            'auto_sync': False
+        }
+
+    s3_config = config.get('s3_sync', {})
+
+    return {
+        'enabled': s3_config.get('enabled', False),
+        'bucket_name': s3_config.get('bucket_name', ''),
+        's3_prefix': s3_config.get('s3_prefix', ''),
+        'aws_profile': s3_config.get('aws_profile', ''),
+        'auto_sync': s3_config.get('auto_sync', False)
+    }

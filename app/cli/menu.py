@@ -2,7 +2,11 @@
 from typing import Optional, List
 
 
-def choose_from_list(items: List[str]) -> Optional[str]:
+def choose_from_list(
+    items: List[str],
+    title: str = "Available videos:",
+    prompt: str = "Type the number of the video you want to process",
+) -> Optional[str]:
     """
     Display a simple numbered menu and return the chosen item.
     Returns None if the user cancels.
@@ -11,13 +15,13 @@ def choose_from_list(items: List[str]) -> Optional[str]:
         print("No items available.")
         return None
 
-    print("\nAvailable videos:")
+    print(f"\n{title}")
     for idx, name in enumerate(items, start=1):
         print(f"  [{idx}] {name}")
 
     while True:
         choice = input(
-            "\nType the number of the video you want to process "
+            f"\n{prompt} "
             "(or 'q' to quit): "
         ).strip()
 

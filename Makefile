@@ -121,6 +121,10 @@ dev-run: ## Run locally (without Docker)
 	@echo "$(BLUE)Running locally...$(NC)"
 	@venv/bin/python3 main.py
 
+dev-s3-sync: ## Run interactive S3 sync locally
+	@echo "$(BLUE)Starting interactive S3 sync...$(NC)"
+	@venv/bin/python3 -m app.cli.s3_sync_cli
+
 dev-test: ## Run tests locally
 	@echo "$(BLUE)Running tests locally...$(NC)"
 	@venv/bin/python3 -m pytest tests/ -v
@@ -164,4 +168,3 @@ version: ## Show version
 
 # Default target
 .DEFAULT_GOAL := help
-

@@ -53,13 +53,26 @@ paths:
 logging:
   # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
   level: "INFO"
-  
+
   # Log format
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  
+
   # Save logs to file
   save_to_file: false
-  
+
   # Log file path (if save_to_file is true)
   log_file: "video_splitter.log"
 
+# AWS S3 Sync Settings
+s3_sync:
+  # Enable S3 sync prompt after processing
+  enabled: true
+
+  # Default S3 bucket name (pode ser deixado vazio para digitar no prompt)
+  bucket_name: ""
+
+  # Default S3 prefix/folder path (pode ser deixado vazio para digitar no prompt)
+  s3_prefix: ""
+
+  # Default AWS profile name (deixe vazio para usar o padrão)
+  aws_profile: ""
