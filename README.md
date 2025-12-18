@@ -160,6 +160,22 @@ O programa vai:
 4. 📊 Mostrar progresso em tempo real
 5. 💾 Salvar aulas em `lessons_output/`
 
+## 📤 Sync com AWS S3 (interativo, via AWS CLI)
+
+Pré-requisitos: AWS CLI instalado e credenciais válidas (profile ou default).  
+Execute:
+```bash
+python -m app.cli.s3_sync_cli
+# ou
+make dev-s3-sync
+```
+
+Fluxo rápido:
+- Informe ou liste (`?`) bucket e prefixo; `0` usa o prefixo mostrado.
+- Navegação S3: números para entrar, `0` para enviar para a pasta atual.
+- Origem local: digite o caminho ou navegue; em navegação use `s<num>` para selecionar um item, `0` para a pasta atual.
+- Se a origem for uma subpasta (ex.: `lessons_output/MeuCurso/`), o nome da subpasta é incluído no destino (ex.: `go/MeuCurso/`). Se for `lessons_output` inteira, não cria pasta extra no S3.
+
 ## ⚙️ Configuração Avançada
 
 ### Ajustar Sensibilidade de Silêncio
@@ -236,4 +252,3 @@ Summary of generated lessons:
 - Ajuste `silence_thresh_offset_db` no `config.yaml`
 - Verifique se o vídeo tem áudio
 - Reduza `min_lesson_duration_sec` se as aulas forem curtas
-
