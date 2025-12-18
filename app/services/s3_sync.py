@@ -23,8 +23,8 @@ class S3Syncer:
         Initialize S3 syncer.
 
         Args:
-            bucket_name: S3 bucket name (e.g., 'temporary-bucket-videos-giustech')
-            s3_prefix: S3 prefix/folder path (e.g., 'go/')
+            bucket_name: S3 bucket name
+            s3_prefix: S3 prefix/folder path
         """
         self.bucket_name = bucket_name
         self.s3_prefix = s3_prefix.rstrip('/') if s3_prefix else ""
@@ -114,7 +114,7 @@ class S3Syncer:
 
         Args:
             local_dir: Local directory path to sync
-            aws_profile: AWS profile name (e.g., 'giustech_aws_root')
+            aws_profile: AWS profile name ()
             dry_run: If True, only show what would be synced without uploading
             delete: If True, delete files in S3 that don't exist locally
 
